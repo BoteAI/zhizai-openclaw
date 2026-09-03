@@ -1,0 +1,44 @@
+name: 发布 Skill 安装包
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建 Skill 安装包
+        run: python3 scripts/build_skill_package.py
+
+      - name: 创建或更新 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ASSET="dist/zhizai-openclaw-${VERSION}.zip"
+          TITLE="智在记录 Skill ${VERSION}"
+          if [[ ! -f "$ASSET" ]]; then
+            echo "missing asset: $ASSET" >&2
+            ls -la dist || true
+            exit 1
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "$TITLE"
+            gh release upload "$GITHUB_REF_NAME" "$ASSET" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$ASSET" \
+              --title "$TITLE" \
+              --generate-notes
+          fi

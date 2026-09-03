@@ -1,0 +1,22 @@
+name: Validate Skill package
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate packaged Skill structure
+        run: |
+          ARCHIVE="$(python3 scripts/build_skill_package.py)"
+          unzip -Z1 "$ARCHIVE" | sed 's#^zhizai-openclaw/##' | sed '/^$/d; /\/$/d' | sort > /tmp/package-files.txt
+          cat /tmp/package-files.txt
+          test "$(cat /tmp/package-files.txt)" = $'SKILL.md\nreferences/auth.md\nreferences/knowledge.md\nreferences/msg-device.md\nreferences/note.md\nreferences/scene.md\nreferences/team.md'
