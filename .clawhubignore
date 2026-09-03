@@ -1,0 +1,8 @@
+README.md
+LICENSE
+package.json
+_meta.json
+.github/
+scripts/
+dist/
+.idea/

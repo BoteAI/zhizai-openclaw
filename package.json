@@ -1,0 +1,33 @@
+{
+  "name": "zhizai-openclaw",
+  "version": "1.0.0",
+  "description": "智在记录：动态模版路由、笔记 CRUD、场景/知识卡/笔记集、团队、鉴权、消息、录音卡。鉴权 ZHIZAI_REC_API_KEY。",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BoteAI/zhizai-openclaw.git"
+  },
+  "homepage": "https://github.com/BoteAI/zhizai-openclaw",
+  "bugs": {
+    "url": "https://github.com/BoteAI/zhizai-openclaw/issues"
+  },
+  "keywords": [
+    "zhizai",
+    "zhiji",
+    "智在记录",
+    "openclaw",
+    "开放平台",
+    "笔记",
+    "团队",
+    "录音卡"
+  ],
+  "openclaw": {
+    "minVersion": "0.1.0",
+    "baseUrl": "https://openapi.zzjilu.com/api/v1",
+    "emoji": "📒",
+    "requires": {},
+    "optionalEnv": [
+      "ZHIZAI_REC_API_KEY"
+    ]
+  }
+}
