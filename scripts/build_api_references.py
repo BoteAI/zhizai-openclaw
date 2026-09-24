@@ -70,20 +70,7 @@ def main() -> int:
     )
     replace_protocol(REF / "scene.md", scene_block)
     replace_protocol(REF / "knowledge.md", parts.get("笔记集 接口", ""))
-    replace_protocol(REF / "team.md", parts.get("团队 接口", ""))
-
-    auth_sec = parts.get("鉴权 接口", "")
-    replace_protocol(REF / "auth.md", auth_sec)
-
-    msg_dev = (
-        parts.get("消息 接口", "")
-        + "\n\n"
-        + parts.get("录音卡 接口", "")
-        + "\n\n## 安全约束（强制）\n\n"
-        "- `sendMessage`：发送前确认手机号与内容。\n"
-        "- 录音卡批量最多 100 个 SN；关注 `notFoundSnList`。\n"
-    )
-    replace_protocol(REF / "msg-device.md", msg_dev)
+    # Skill 1.0.1 只保留场景适配接口：不再写入 team / msg / auth 业务接口。
     return 0
 
 

@@ -1,7 +1,7 @@
 {
   "name": "zhizai-openclaw",
-  "version": "1.0.0",
-  "description": "智在记录：动态模版路由、笔记 CRUD、场景/知识卡/笔记集、团队、鉴权、消息、录音卡。鉴权 ZHIZAI_REC_API_KEY。",
+  "version": "1.0.1",
+  "description": "智在记录：场景落地（做成笔记/列表/等待/场景/笔记集归档/问小智）、动态模版问答、笔记 CRUD。直调开放 API，鉴权 ZHIZAI_REC_API_KEY。",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,9 +17,7 @@
     "智在记录",
     "openclaw",
     "开放平台",
-    "笔记",
-    "团队",
-    "录音卡"
+    "笔记"
   ],
   "openclaw": {
     "minVersion": "0.1.0",
@@ -27,7 +25,8 @@
     "emoji": "📒",
     "requires": {},
     "optionalEnv": [
-      "ZHIZAI_REC_API_KEY"
+      "ZHIZAI_REC_API_KEY",
+      "ZHIZAI_APP_ID"
     ]
   }
 }

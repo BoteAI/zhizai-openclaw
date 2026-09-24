@@ -1,6 +1,10 @@
 # 智在记录 · 笔记
 
-通过开放 API 完成笔记检索、问答总结、CRUD、上传与下载。不要凭印象猜字段；机器调用以本文件「接口协议」为准。
+通过开放 API 完成笔记检索、增删改查、上传与下载。不要凭印象猜字段；机器调用以本文件「接口协议」为准。
+
+语义检索走 [`xiaozhi.md`](xiaozhi.md)，不要用本文件的列表冒充。不要调用问小智 URL 配置 `addOrUpdateParamsByCode`。
+
+对外一次「做成笔记」时，内部才允许上传 + 创建 + 轮询，不要对用户呈现「已上传」半成品。
 
 ## 统一结果判定
 
@@ -20,19 +24,24 @@
 对用户：可用 `resultMsg` 短句；禁止展示完整 Key、`stack`、未脱敏 `errorInfos`。限流 ≤2 次/秒。
 
 `ZHIZAI_BASE_URL` = `https://openapi.zzjilu.com/api/v1`。Header：`Authorization: ${ZHIZAI_REC_API_KEY}`（无 Bearer）。
+如返回「缺失应用 ID」，下载音频、移笔记再补 `APP-ID`（见 SKILL.md）。
 
-## 动态模版管线（基于笔记作答 / 总结 · 强制）
+## 动态模版管线（周报 / 复盘 / 按结构总结）
 
-**可跳过**（仅限）：纯新建/编辑/删除、上传、下录音、视频笔记创建、文字总结 SSE、以及不依赖多篇笔记成文的操作。
+用户明确要按结构成文（写周报、复盘、按某某结构总结）时走本管线。可跳过：纯新建/编辑/删除、上传、下录音、文字总结 SSE、问小智、以及不依赖多篇笔记成文的操作。
 
-否则必须：
+「找、搜、关于某主题」的**语义问答**走 [`xiaozhi.md`](xiaozhi.md)。不要用本管线或 `queryNoteList` 冒充语义搜索。
+
+必须按序：
 
 1. **归一化**：主题词、时间词、用户自带模版。
 2. **查模版**：`GET /know/queryStandardInputOutputByCommand?command=`（URL 编码）。先关键词；`output` 空再用完整原句；两次仍空则语义兜底。
 3. **查笔记**：`POST /note/queryNoteList`（时间范围、`pageSize` 默认 100 翻页）；需要正文再 `GET /note/querySingleNoteDetail`。
 4. **成文**：用户模版 > 接口 `output` > 语义兜底（概览→发现→建议）。无相关笔记则柔和说明，禁止编造。
 
-### 时间粒度
+## 时间粒度与类型
+
+列表、人资查询按用户时间词填 `startTime` / `endTime`：
 
 | 表述 | startTime | endTime |
 |---|---|---|
@@ -52,28 +61,45 @@
 | document | 文档 |
 | link | 链接 |
 | image | 图片 |
+| video | 视频 |
 | knowCard | 知识卡片 |
 
 ### noteState（仅进度，非正文）
 
-`completed` 已完成 / `pending` 处理中 / `recognizing` 转写中 / `analyzing` 总结中 / `failed` 失败。
+`completed` 已完成 / `pending` 处理中 / `recognizing` 转写中 / `analyzing` 总结中 / `failed` 失败 / `recognizing_failed` 转写失败 / `analyzing_failed` 总结失败。
 
 ## 意图路由
 
-| 意图 | 接口入口 |
+| 用户意图（场景说法） | 接口入口 |
 |---|---|
-| 标准输出模版 | `GET /know/queryStandardInputOutputByCommand` |
-| 列表筛选 | `POST /note/queryNoteList` |
-| 详情 | `GET /note/querySingleNoteDetail` |
-| 构建进度 | `GET /note/queryNoteStatus` |
-| 删除 | `GET /note/deleteNote`（先确认） |
-| 修改标题/摘要/总结 | `POST /note/updateNoteInfo` |
-| 上传文件 | `POST /file/uploadSingleFile` |
-| 创建笔记 | `POST /note/createNote` |
-| 文字总结（SSE） | `POST /note/createTextNoteSummary` |
-| 视频建笔记 | `POST /note/addVideoLinkNoteByFileId` |
-| 下载录音 | `GET /note/downloadNoteAudio` |
-| 问小智 URL 配置 | `GET /note/addOrUpdateParamsByCode` |
+| 周报/复盘/按结构成文（不是问小智） | `GET /know/queryStandardInputOutputByCommand` |
+| 最近/类型/标题/时间列表（不是语义搜索） | `POST /note/queryNoteList` |
+| 打开详情；只要原文/总结则只展示 `content`/`summary` | `GET /note/querySingleNoteDetail` |
+| 主笔记 + 追加段 | `GET /note/qryNoteDetailInfoAndAppend` |
+| 进度 / 等到完成 | `GET /note/queryNoteStatus`（等待=轮询至 `completed`/`failed`/`*_failed`） |
+| 删除（先确认） | `GET /note/deleteNote` |
+| 改标题/摘要/总结 | 先有真实 `noteId`，再 `POST /note/updateNoteInfo`。无 ID：先 `queryNoteList` |
+| 只上传、不创建笔记 | `POST /file/uploadSingleFile` |
+| 按 fileId 取回文件 | `GET /file/getFile/{fileId}` |
+| 做成文字/链接/录音/图片/文档笔记 | `POST /note/createNote`（需文件时内部先上传） |
+| 给一段文字流式总结 | `POST /note/createTextNoteSummary`（点了场景名才查 `sceneId`） |
+| 下载笔记录音 | `GET /note/downloadNoteAudio` |
+| 人资：按标题时间查总结和录音 | `GET /note/querySummaryAndRecording` |
+| 语义问答 | 见 [`xiaozhi.md`](xiaozhi.md)，不要用本文件 |
+
+无 `noteId` 时禁止详情/改删/下载/等待。先 `queryNoteList` 按标题匹配，零条停、多条让用户选。**改标题/摘要/总结必须先拿到真实 `noteId` 再调 `updateNoteInfo`**，没有 ID 禁止调用。用户没要分享时不要主动短链；需要时才传 `withShortUrl=true`。不把 `summary` 冒充转写原文。
+
+`createNote` 录音可带 `voiceContent.knowledgeId` / `directoryId`：用户说「放到某某笔记集」时先解析真实 ID 再写入。无效 `knowledgeId`：笔记可能已创建，必须写清「已创建但未归档」。不传目录或 `-1` 表示笔记集根层。
+
+`appendNoteId` 对应「追加到已有会」。必须先有真实 `noteId`。
+
+按 fileId 取回文件：`GET /file/getFile/{fileId}`。路径参数 `fileId` 当字符串。成功是二进制或重定向到文件服务器（curl 要 `--location`）。HTTP 404 表示文件不存在。用户要笔记录音原文件时用 `downloadNoteAudio`。
+
+详情：`resultCode=0` 但 `resultObject.id` 为空（或对象无标题）→ 笔记不存在，不要说已打开。
+
+下载录音 / 按 fileId 取回：成功才是二进制流，或跟随重定向后再落盘。若返回 JSON，如实失败，不要假装已保存到本地。`downloadNoteAudio` 若报「缺失应用 ID」，补 Header `APP-ID`（上传回包 `appId`）。`GET /file/getFile/{fileId}`：404=文件不存在；401 空 body=Key 未勾选该接口。
+
+`updateNoteInfo` / 部分写接口若 `401` 且文案含「请关联API」（或空 body）：当前 Key 未授权该接口，引导去开发者后台勾选，不要改用错误接口冒充已改标题。
 
 ## 新建与文件依赖
 
@@ -84,9 +110,12 @@
 | 文档 | document | 是 → `documentContent.fileId` |
 | 图片 | image | 是 → `imageContent.fileIds[].fileId` |
 | 录音 | voice | 是 → `voiceContent.voiceFileId` |
-| 视频笔记 | — | 是 → `addVideoLinkNoteByFileId.fileId` |
 
-推荐：`uploadSingleFile` → `createNote`（或视频接口）→ 必要时 `queryNoteStatus`。
+本地视频不能做成笔记：停并说明。用户只要「上传」则只 `uploadSingleFile`。禁止当成录音。
+
+对外一次「做成笔记」：内部才 `uploadSingleFile` → `createNote` → 异步类型默认轮询 `queryNoteStatus` 至终态 → 仅 `completed` 后再读详情。用户说不用等则不轮询。路径不存在或扩展名不支持时本地失败，不调创建接口。
+
+录音/图片/文档默认等待；文字与链接通常无需等待。成功最低标准：非空 `noteId`。只有 `completed` 才能宣称转写/总结已完成。`failed` / `recognizing_failed` / `analyzing_failed` 禁止自动再创建。
 
 ## 结果呈现
 
@@ -115,6 +144,7 @@
 | pageNum | integer | 否 | 当前页码（默认1） |
 | pageSize | integer | 否 | 每页条数（默认10） |
 | withContent | string | 否 | 是否返回内容（true/false） |
+| withShortUrl | string | 否 | `"true"` 时列表带短链。用户没要分享不要传 |
 
 #### 请求示例
 
@@ -248,6 +278,7 @@ curl --request POST \
 | 参数名 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | noteId | string | 是 | 笔记ID |
+| withShortUrl | string | 否 | `"true"` 才返回 `short_url` |
 
 #### 请求示例
 
@@ -426,7 +457,7 @@ curl --request GET \
 
 ### POST `/note/updateNoteInfo`  修改笔记
 
-**接口说明**：修改笔记，部分修改笔记标题、短摘要或AI录音总结；未传或空白的字段保持不变  
+**接口说明**：修改笔记，部分修改笔记标题、短摘要或 AI 录音总结；未传或空白的字段保持不变。**`noteId` 必填**。用户只说标题或「这条」时，必须先 `queryNoteList` 拿到真实 ID，再调本接口；没有 `noteId` 禁止调用。改完再 `querySingleNoteDetail` 读回。 
 
 #### 请求参数
 
@@ -489,14 +520,18 @@ curl --request POST \
 | voiceContent | object | 否 | 录音笔记内容（noteType=voice时传入） |
 | voiceContent.text | string | 否 | 随手记（语音转文字内容） |
 | voiceContent.voiceFileId | string | 否 | 音频文件ID |
+| voiceContent.title | string | 否 | 自定义标题（也认错拼 `titile`） |
 | voiceContent.recStartTime | string | 否 | 录制开始时间 |
 | voiceContent.recEndTime | string | 否 | 录制结束时间（yyyy-MM-dd HH:mm:ss） |
-| voiceContent.duration | string | 否 | 录音时长 |
+| voiceContent.duration | string | 否 | 录音时长，单位秒 |
 | voiceContent.imageFileIds | array | 否 | 随手拍图片文件ID列表 |
 | voiceContent.appendNoteId | string | 否 | 追加笔记ID |
 | voiceContent.deviceSn | string | 否 | 录音卡SN码 |
 | voiceContent.latitude | string | 否 | 录音地理位置纬度 |
 | voiceContent.longitude | string | 否 | 录音地理位置经度 |
+| voiceContent.recordingSource | string | 否 | `realtime` / `phoneInternal` / `offlineImport` / `recordingCard`。未指定时传 `offlineImport` |
+| voiceContent.knowledgeId | string | 否 | 总结完成后归档到该笔记集。无效时笔记仍可能创建成功 |
+| voiceContent.directoryId | string | 否 | 与 `knowledgeId` 组合；不传或 `-1` 表示笔记集根层 |
 | textContent | object | 否 | 文字笔记内容（noteType=text时传入） |
 | textContent.title | string | 否 | 笔记标题 |
 | textContent.content | string | 否 | 文字内容 |
@@ -507,6 +542,7 @@ curl --request POST \
 | documentContent | object | 否 | 文档笔记内容（noteType=document时传入） |
 | documentContent.fileId | string | 否 | 文件ID |
 | documentContent.fileName | string | 否 | 文件名称 |
+| documentContent.title | string | 否 | 笔记标题，优先于文件名 |
 | linkContent | object | 否 | 链接笔记内容（noteType=link时传入） |
 | linkContent.url | string | 否 | 链接地址 |
 
@@ -598,7 +634,7 @@ curl --request POST \
 | 参数名 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | content | string | 是 | 笔记内容 |
-| sceneId | string | 是 | 场景ID（用于AI总结的场景） |
+| sceneId | string | 否 | 场景ID。用户点了场景名必须先查到真实 ID；没点可以不传 |
 
 #### 请求示例
 
@@ -626,57 +662,6 @@ curl --request POST \
 data: ## 会议目标
 data: - 进行通话设备测试。
 data: （SSE流式响应，每个data事件为AI总结增量文本片段，直至流结束）
-```
-
-### POST `/note/addVideoLinkNoteByFileId`  根据视频文件ID新增视频链接笔记
-
-**接口说明**：根据视频文件ID创建视频链接笔记，服务端自动完成音频提取、转写、AI总结与知识库同步（异步处理）  
-
-#### 请求参数
-
-| 参数名 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| fileId | Long | 是 | 视频文件ID（文件服务中的文件ID，需先调用文件上传接口获取） |
-
-#### 请求示例
-
-```bash
-curl --request POST \
-  --url https://openapi.zzjilu.com/api/v1/note/addVideoLinkNoteByFileId \
-  --header 'Authorization: your api-key' \
-  --header 'content-type: application/json' \
-  --data '{
-  "fileId" : 1410460000000000123
-}'
-```
-
-#### 响应参数
-
-| 参数名 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| resultCode | string | 是 | 结果码，0表示成功，-1表示失败 |
-| resultMsg | string | 是 | 结果信息，成功时为success，失败时为失败原因描述 |
-| resultObject | object | 是 | 返回数据对象；失败时若笔记已创建仍会返回 |
-| resultObject.mainNoteId | string | 是 | 主笔记ID；部分失败场景（转写失败）笔记已创建时也会返回 |
-| resultObject.notesCount | integer | 是 | 当前用户有效笔记数量（排除demo来源笔记）；失败时为null |
-| stack | string | 否 | 异常堆栈信息 |
-| errorInfos | array | 否 | 错误信息列表 |
-| guidance | string | 否 | 引导信息 |
-
-#### 响应示例
-
-```json
-{
-  "resultCode": "0",
-  "resultMsg": "success",
-  "resultObject": {
-    "mainNoteId": "1410461159968960512",
-    "notesCount": 23
-  },
-  "stack": "",
-  "errorInfos": null,
-  "guidance": null
-}
 ```
 
 ### POST `/file/uploadSingleFile`  文件上传
@@ -812,15 +797,78 @@ curl --request GET \
 }
 ```
 
+### GET `/file/getFile/{fileId}`  按文件 ID 下载
+
+**接口说明**：按文件 ID 下载。成功时返回**二进制文件流**，或 **302/301 重定向到文件服务器**，不是统一 JSON。用户说的是「这条会的录音」时走 `downloadNoteAudio`，不要走本接口。没有 `fileId` 禁止调用。
+
+#### 请求参数
+
+| 参数名 | 类型 | 必填 | 位置 | 说明 |
+| --- | --- | --- | --- | --- |
+| fileId | string | 是 | 路径 | 文件 ID。协议类型是 Long，**当字符串传递**，禁止 JS 数字 |
+
+Header：`Authorization: ${ZHIZAI_REC_API_KEY}`（无 Bearer）。
+
+#### 请求示例
+
+```bash
+curl --request GET \
+  --url "${ZHIZAI_BASE_URL}/file/getFile/${fileId}" \
+  --header "Authorization: ${ZHIZAI_REC_API_KEY}" \
+  --location \
+  --output meeting.mp3
+```
+
+`--location`：成功可能是重定向，必须跟随跳转到文件服务器再落盘。
+
+#### 响应
+
+| 参数名 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| Content-Type | header | 是 | 文件 MIME 类型；也可能是重定向响应 |
+| responseBody | binary | 是 | 二进制文件流 |
+| HTTP 404 | error | 否 | 文件不存在 |
+
+成功：**HTTP 200 二进制**，或 **3xx 后落到文件流**。按 `Content-Type` / `Content-Disposition` 决定扩展名；没有文件名时用用户指定路径或 `downloaded.bin`。
+
+失败：
+
+- HTTP 404：文件不存在，停并说明。
+- HTTP 401 且 body 为空：当前 Key 未勾选本接口，引导开发者后台勾选；不要改生产或假装已保存。
+- `Content-Type` 为 JSON：读 `resultMsg`/`message`，如实失败，**不要**假装已保存到本地。
+
+### GET `/note/qryNoteDetailInfoAndAppend`  主笔记 + 追加段
+
+Query：`noteId`。
+
+`resultObject.queryMainNoteInfo` 为主笔记；`queryRecordingNote` 等为追加段列表。用户说「把追加的也给我」时走本接口，不要只读单条详情再编造追加段。
+
+### GET `/note/querySummaryAndRecording`  按标题时间查总结和录音
+
+| Query | 说明 |
+|---|---|
+| title | 标题模糊 |
+| startTime / endTime | 时间范围，见上文时间粒度 |
+
+`resultObject[]`：
+
+| 字段 | 说明 |
+|---|---|
+| noteId / noteTitle / noteCreateTime / noteStatus | 笔记 |
+| sceneList | `{ scene_id, scene_name, summary_content, create_time }` |
+| recordingList | `{ recording_id, duration, start_time, create_time, transcript[] }` |
+
+`transcript[]`：`raw_text`、`start`、`end`、`spk`。打开某一条再用 `querySingleNoteDetail`。
+
 ### GET `/know/queryStandardInputOutputByCommand`  按指令查询标准输入输出模板
 
-**接口说明**：按指令查询标准输入输出模板，支持控制问小智指定大模型的输入输出格式  
+**接口说明**：按指令查询标准输入输出模板，支持控制问小智指定大模型的输入输出格式。用于周报/复盘/按结构总结，**不能**拿来当问小智提问。
 
 #### 请求参数
 
 | 参数名 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| command | string | 是 | 指令 |
+| command | string | 是 | 指令（URL 编码）。先传关键词，`output` 空再用完整原句 |
 
 #### 请求示例
 
@@ -835,67 +883,10 @@ curl --request GET \
 | 参数名 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | resultCode | string | 是 | 结果码，0表示成功 |
-| resultMsg | string | 是 | 结果信息，查询成功 |
+| resultMsg | string | 是 | 结果信息 |
 | resultObject | object | 是 | 返回数据对象 |
 | resultObject.input | string | 是 | 查询输入提示词/检索条件描述 |
-| resultObject.output | string | 是 | 查询输出结果/周报内容 |
-| stack | string | 是 | 异常堆栈信息 |
-| errorInfos | null | 否 | 错误信息列表 |
-| guidance | null | 否 | 引导信息 |
+| resultObject.output | string | 是 | 成文结构/输出模版 |
 
-#### 响应示例
+`output` 为空时用完整原句再查一次；两次仍空则按「概览 → 发现 → 建议」兜底。成文必须填真实笔记，禁止编造。
 
-```json
-{
-  "resultCode": "0",
-  "resultMsg": "查询成功",
-  "resultObject": {
-    "input": "检索知识库中本周（2024年11月18日-2024年11月24日）【部门例会/项目评审会/跨部门协调会/研谈沟通】类工作会议笔记：1. 周报基础信息：姓名{姓名}、岗位{岗位}、周期{YYYY.MM.DD-YYYY.MM.DD}、汇报对象{汇报对象}；2 核心工作模块：{模块1（优先级1）、模块2（优先级2）、模块3（优先级3）}；3. 量化指标：{指标1、指标2、指标3}；4. 特殊要求：{重点内容+新增模块+汇报风格}；要求输出格式：含\"工作概述、核心成果、数据复盘、问题与改进、下周计划\"五大模块，核心成果需关联知识库笔记来源。",
-    "output": "【{周/月/季/年报标题}】{用户姓名}-2025.11.10-2025.11.16{周/月/季/年}报（汇报对象：{汇报人姓名}）<br>一、工作概述<br>本周聚焦核心项目V2.0版本开发迭代目标，完成3个核心功能模块开发，修复线上Bug12个（修复率92.3%），编写技术文档5份；重点攻克\"用户登录权限加密\"技术难点，确保模块按时交付；同步配合测试部完成首轮功能测试，整体工作符合项目排期，开发任务完成率100%。<br><br>二、核心成果（按优先级排序）<br>1. 项目V2.0核心功能开发完成（重点成果）<br>成果内容：独立完成\"用户登录权限加密\"\"数据批量导出\"\"异常日志自动上报\"3个核心模块开发，代码提交量2100行，通过内部代码评审（通过率100%），按时交付测试部，较计划提前0.5个工作日。<br>关键动作：11月10日拆解模块开发任务并制定时间表、11月11-13日完成\"权限加密\"模块开发与自测、11月14-15日完成剩余2个模块开发、11月16日提交代码评审并交付测试。<br><br>2. 线上Bug高效修复<br>成果内容：本周接收线上Bug工单13个，完成修复12个，修复率92.3%，平均修复时长2.5小时（目标4小时）；其中2个高优先级Bug（影响10%用户登录）1小时内响应并修复，未造成用户流失。<br>关键动作：11月12日建立\"Bug优先级分级处理机制\"、每日早会同步Bug修复进度、晚间复盘修复方案优化点。<br><br>3. 技术文档规范化编写<br>成果内容：完成《V2.0权限加密模块开发文档》《Bug修复方案汇总》等5份技术文档编写，其中3份被纳入部门\"技术文档规范案例\"，为后续迭代及新人交接提供支撑。<br>关键动作：11月13-15日分模块同步编写文档、11月16日结合代码评审意见优化文档细节。"
-  },
-  "stack": "",
-  "errorInfos": null,
-  "guidance": null
-}
-```
-
-### GET `/note/addOrUpdateParamsByCode`  添加或修改问小智URL配置
-
-**接口说明**：添加或修改问小智URL配置  
-
-#### 请求参数
-
-| 参数名 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| teamId | string | 是 | 团队ID |
-| url | string | 是 | 问小智配置链接地址 |
-
-#### 请求示例
-
-```bash
-curl --request GET \
-  --url https://openapi.zzjilu.com/api/v1/note/addOrUpdateParamsByCode?teamId=&url= \
-  --header 'Authorization: your api-key'
-```
-
-#### 响应参数
-
-| 参数名 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| resultCode | string | 是 | 状态码，0 表示成功, 其它均为失败 |
-| resultMsg | string | 是 | 提示信息 |
-| resultObject | string | 是 | 返回结果字符串 |
-| stack | string | 是 | 异常堆栈信息 |
-| errorInfos | array | 否 | 错误信息列表 |
-| guidance | string | 否 | 引导信息 |
-
-#### 响应示例
-
-```json
-{
-  "resultCode": "",
-  "resultMsg": "",
-  "resultObject": "",
-  "stack": ""
-}
-```

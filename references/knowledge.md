@@ -1,6 +1,10 @@
 # 智在记录 · 笔记集
 
-查询我创建的、我收到的笔记集及集内详情。基于集内笔记做总结/问答时，仍须先走 `note.md` 动态模版管线。
+查询、打开、新建笔记集，建目录、移笔记、删目录。用户说笔记集**名称**时必须先 list 再匹配 `knowledgeId`，禁止把名称当 ID。
+
+根层目录 ID 为 `-1`。出参目录主键是 `catalogId`，入参可用 `directoryId` 或 `catalogId`。
+
+「在某某笔记集里问」的语义问答走 [`xiaozhi.md`](xiaozhi.md)，先解析 `knowledgeId`（及目录则 `directoryId`）。按结构成文且范围在某集内时：先解析 ID、打开集内笔记，再走动态模版管线。
 
 ## 统一结果判定
 
@@ -24,18 +28,28 @@
 
 ## 意图路由
 
-| 意图 | 接口 |
+| 用户意图 | 接口 |
 |---|---|
-| 笔记集详情 | `POST /note/queryNoteKnowledgeDetail` |
-| 我收到的笔记集 | `POST /note/queryNoteKnowledgeEmpower` |
 | 我创建的笔记集 | `POST /note/queryNoteKnowledge` |
+| 我收到的笔记集 | `POST /note/queryNoteKnowledgeEmpower` |
+| 按名称匹配目录 | `POST /note/queryKnowledgeCatalog` |
+| 打开笔记集 / 目录 / 集内笔记 | `POST /note/queryNoteKnowledgeDetail` |
+| 新建笔记集 | `POST /note/createNoteKnowledge` |
+| 建目录 | `POST /note/addKnowledgeCatalog` |
+| 加入或移动笔记 | `POST /note/moveNotesToKnowledge` |
+| 删目录 | `GET /note/deleteKnowledgeCatalog`（须先确认） |
 
 ## 使用注意
 
 - 我创建：`qryType` 必填，默认 `myCreate`。
-- 我收到：`qryEmpowerToMe=true`，`qryEmpowerFromMe=false`。
-- 详情：`knowledgeId` 必填；`needSummaryContent` 默认 false，需要时再开。
-- 条目 `noteType` 展示前转中文（见 `note.md`）。
+- 我收到：`qryEmpowerToMe=true`，`qryEmpowerFromMe=false`。别人分享的先走这条。
+- 详情：`knowledgeId` 必填（真实 ID，不是名称）；`needSummaryContent` 默认 false，需要集内摘要时再开。`directoryId` 空=整个笔记集；`-1`=根层。
+- 目录名称：先有 `knowledgeId`，再 `queryKnowledgeCatalog`（父目录不传或 `-1` 为根层直接子目录，不穿透），按 `catalogName` 匹配。不要一上来编 ID。
+- 条目 `noteType` 展示前转中文（text 文本、voice 录音、document 文档、link 链接、image 图片）。
+- 做成笔记时归档：把真实 `knowledgeId`/`directoryId` 写入 `createNote.voiceContent`（见 `note.md`），不是本文件的移笔记接口。
+- 已在目标目录可能失败，文案类似「没有需要添加的笔记」。
+- `moveNotesToKnowledge` 若 `resultMsg` 含「缺失应用 ID」，补 Header `APP-ID`（与上传回包 `appId` 相同）后重试。
+- 删目录级联去掉子目录和笔记**关联**，不删笔记正文。必须确认后再调。
 
 ## 接口协议
 
@@ -48,6 +62,7 @@
 | 参数名 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | knowledgeId | Long | 是 | 知识库ID |
+| directoryId | string | 否 | 也认 `catalogId`。空=整个笔记集；`-1`=根层 |
 | knowledgeSourceType | string | 否 | 知识来源类型(note:笔记, file:文件) |
 | searchContent | string | 否 | 搜索内容 |
 | startTime | string | 否 | 开始时间 |
@@ -617,3 +632,65 @@ curl --request POST \
   "guidance": null
 }
 ```
+
+### POST `/note/queryKnowledgeCatalog`  按父目录列子目录
+
+名称匹配在客户端做。列根层时 `knowledgeId` 必填。`catalogId` 不传或 `-1` 表示根层直接子目录，不穿透。
+
+```json
+{ "knowledgeId": "1419241827901288448", "catalogId": "-1" }
+```
+
+出参为目录树节点数组：
+
+| 字段 | 说明 |
+|---|---|
+| catalogId | 即 `directoryId` |
+| knowledgeId | 所属笔记集 |
+| catalogName | 目录名 |
+| parentCatalogId | 父目录，根层为 `-1` |
+| detailTotal / catalogTotal | 该层笔记数 / 子目录数 |
+| children | 子节点（若返回） |
+
+### POST `/note/createNoteKnowledge`  新建笔记集
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| knowledgeName | 是 | 名称 |
+| knowledgeDetail | 否 | 描述 |
+| knowledgeAttribute | 否 | 默认 `private` |
+
+`resultObject` 为新 `knowledgeId`（当字符串保存）。路径是 `/note/createNoteKnowledge`，不是 `/note/createKnowledge`。
+
+```bash
+curl -X POST "${ZHIZAI_BASE_URL}/note/createNoteKnowledge" \
+  -H "Authorization: ${ZHIZAI_REC_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"knowledgeName":"工作笔记集","knowledgeAttribute":"private"}'
+```
+
+### POST `/note/addKnowledgeCatalog`  新建目录
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| knowledgeId | 是 | 笔记集 ID |
+| directoryName | 是 | 也认 `catalogName` |
+| parentDirectoryId | 否 | 也认 `parentCatalogId`。不传或 `-1` 表示根层 |
+
+出参含 `catalogId`（即 `directoryId`）、`catalogName`、`knowledgeId`、`parentCatalogId`。父目录无效会失败。
+
+### POST `/note/moveNotesToKnowledge`  加入或移动笔记
+
+| 字段 | 说明 |
+|---|---|
+| knowledgeId | 与 `knowledgeIdList` 二选一 |
+| knowledgeIdList | 多笔记集 |
+| noteId | 与 `noteIdList` 二选一 |
+| noteIdList | 批量 |
+| directoryId | 也认 `catalogId`。不传或 `-1` 表示根层。指定具体目录时只能对着一个笔记集 |
+
+未入集则新增关联；已在集内则改目录。不删除笔记正文。已在目标目录可能失败，文案类似「没有需要添加的笔记」。
+
+### GET `/note/deleteKnowledgeCatalog`  删目录
+
+Query：`directoryId` 或 `catalogId`，二选一。级联去掉子目录和笔记**关联**，不删笔记正文。必须确认后再调。

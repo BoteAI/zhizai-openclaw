@@ -2,6 +2,8 @@
 
 查询总结场景与知识卡笔记。创建笔记或文字总结需要 `sceneId` 时先读本文件。
 
+用户说「用某某场景」是组合：先按名称匹配真实 `id`，再交给 `createNote.sceneId` / `createTextNoteSummary.sceneId`。查不到则停，不要空传。
+
 ## 统一结果判定
 
 先看 HTTP：`400`/`401`/`406` → 无权限（检查 `ZHIZAI_REC_API_KEY`）。再看 JSON：`resultCode == "0"` 为成功。
@@ -32,9 +34,11 @@
 
 ## 使用注意
 
-- `createNote.sceneId` / `createTextNoteSummary.sceneId` 必须来自场景列表真实 `id`。
+- `createNote.sceneId` / `createTextNoteSummary.sceneId` 必须来自 `queryMySceneList` 或 `queryInnerSceneList` 返回的真实 `id`。禁止把场景名称当 ID。
+- 「有哪些总结场景」→ `queryInnerSceneList`；「我的场景」→ `queryMySceneList`（含共享则 `includeSharedFlag=true`）。空列表是成功。
+- 内置场景 `resultObject` 是 `Map<分类ID, 场景[]>` 加 `groupInfo`，**不是** `{list:[]}`。先展开各分类数组再按 `scene_name` 匹配（例如「会议纪要」）。
 - 内置场景用 `groupInfo` 把分类 ID 转成中文分类名再展示。
-- 知识卡 `summary_content` 可能为密文；对用户优先用 `summary` / `cards` 明文。
+- 知识卡：「我的知识卡」→ `POST /note/queryKnowledgeCardByPage`。`summary_content` 可能为密文；对用户优先用 `summary` / `cards` 明文。
 
 ## 接口协议
 

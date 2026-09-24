@@ -19,4 +19,4 @@ jobs:
           ARCHIVE="$(python3 scripts/build_skill_package.py)"
           unzip -Z1 "$ARCHIVE" | sed 's#^zhizai-openclaw/##' | sed '/^$/d; /\/$/d' | sort > /tmp/package-files.txt
           cat /tmp/package-files.txt
-          test "$(cat /tmp/package-files.txt)" = $'SKILL.md\nreferences/auth.md\nreferences/knowledge.md\nreferences/msg-device.md\nreferences/note.md\nreferences/scene.md\nreferences/team.md'
+          test "$(cat /tmp/package-files.txt)" = $'SKILL.md\nreferences/auth.md\nreferences/knowledge.md\nreferences/note.md\nreferences/scenarios.md\nreferences/scene.md\nreferences/xiaozhi.md'

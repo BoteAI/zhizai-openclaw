@@ -18,3 +18,7 @@ config.json
 
 # Generated upload archive
 dist/
+docs/
+__pycache__/
+*.pyc
+tests/

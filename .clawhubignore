@@ -4,5 +4,6 @@ package.json
 _meta.json
 .github/
 scripts/
+tests/
 dist/
 .idea/
