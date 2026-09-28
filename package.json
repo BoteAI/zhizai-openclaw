@@ -1,6 +1,6 @@
 {
   "name": "zhizai-openclaw",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "智在记录：场景落地（做成笔记/列表/等待/场景/笔记集归档/问小智）、动态模版问答、笔记 CRUD。直调开放 API，鉴权 ZHIZAI_REC_API_KEY。",
   "license": "MIT",
   "repository": {
