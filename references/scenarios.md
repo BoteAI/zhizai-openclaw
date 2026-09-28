@@ -87,7 +87,6 @@
 | 主笔记 + 追加段 | ✅ 组合 1～2 | 「把追加的也给我」 | ① 无 ID 先查 ② `GET /note/qryNoteDetailInfoAndAppend` | 不要只读单条详情再编造追加段 |
 | 处理进度 | ✅ 组合 1～2 | 「转写好了吗」 | `GET /note/queryNoteStatus` | pending / recognizing / analyzing / completed / failed |
 | 等到完成再给内容 | ✅ 组合 2～3 | 「等它处理完再给我」 | ① 无 ID 先查 ② 轮询 status ③ 仅 completed 后再详情 | 失败如实返回，不自动再创建 |
-| 人资：这个月经营会 | ✅ | 「查这个月经营会的总结和录音」 | `GET /note/querySummaryAndRecording`（`title` + 本月时间）。没有该接口再退回 `queryNoteList` `noteType=voice` | 打开某一条再变组合详情 |
 
 ---
 

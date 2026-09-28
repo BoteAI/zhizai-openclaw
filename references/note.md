@@ -41,7 +41,7 @@
 
 ## 时间粒度与类型
 
-列表、人资查询按用户时间词填 `startTime` / `endTime`：
+列表按用户时间词填 `startTime` / `endTime`：
 
 | 表述 | startTime | endTime |
 |---|---|---|
@@ -84,7 +84,6 @@
 | 做成文字/链接/录音/图片/文档笔记 | `POST /note/createNote`（需文件时内部先上传） |
 | 给一段文字流式总结 | `POST /note/createTextNoteSummary`（点了场景名才查 `sceneId`） |
 | 下载笔记录音 | `GET /note/downloadNoteAudio` |
-| 人资：按标题时间查总结和录音 | `GET /note/querySummaryAndRecording` |
 | 语义问答 | 见 [`xiaozhi.md`](xiaozhi.md)，不要用本文件 |
 
 无 `noteId` 时禁止详情/改删/下载/等待。先 `queryNoteList` 按标题匹配，零条停、多条让用户选。**改标题/摘要/总结必须先拿到真实 `noteId` 再调 `updateNoteInfo`**，没有 ID 禁止调用。用户没要分享时不要主动短链；需要时才传 `withShortUrl=true`。不把 `summary` 冒充转写原文。
@@ -842,23 +841,6 @@ curl --request GET \
 Query：`noteId`。
 
 `resultObject.queryMainNoteInfo` 为主笔记；`queryRecordingNote` 等为追加段列表。用户说「把追加的也给我」时走本接口，不要只读单条详情再编造追加段。
-
-### GET `/note/querySummaryAndRecording`  按标题时间查总结和录音
-
-| Query | 说明 |
-|---|---|
-| title | 标题模糊 |
-| startTime / endTime | 时间范围，见上文时间粒度 |
-
-`resultObject[]`：
-
-| 字段 | 说明 |
-|---|---|
-| noteId / noteTitle / noteCreateTime / noteStatus | 笔记 |
-| sceneList | `{ scene_id, scene_name, summary_content, create_time }` |
-| recordingList | `{ recording_id, duration, start_time, create_time, transcript[] }` |
-
-`transcript[]`：`raw_text`、`start`、`end`、`spk`。打开某一条再用 `querySingleNoteDetail`。
 
 ### GET `/know/queryStandardInputOutputByCommand`  按指令查询标准输入输出模板
 
