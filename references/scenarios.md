@@ -83,6 +83,7 @@
 | 列表带正文 | ✅ | 「列表里把内容也带上」 | `withContent=true` | |
 | 列表/详情短链 | ✅ | 「要短链」 | 列表/详情传 `withShortUrl=true` | 用户没要分享不要传 |
 | 单条详情 | ✅ 组合 1～2 | 「打开这条」 | 已有 ID：`querySingleNoteDetail`。只有标题：先列表再详情 | 处理中须说明 |
+| 按条件查单条详情 | ✅ 组合 1～2 | 「按条件查这条笔记详情」 | 已有 `noteId`：`GET /lcdp-app/server/app/note/notes/querySingleNoteDetailByCondition`（`withShortUrl` 默认 `false`）。只有标题：先列表 | 返回标题、摘要、正文、状态、来源。不是 `querySingleNoteDetail`，不要拼到开放 API 基址 |
 | 只要转写 / 只要总结 | ✅ 组合 1～2 | 「只要转写原文」 | 详情后只展示 `content` 或 `summary` | 不把 summary 冒充原文；`recognizing`/`analyzing` 提示未完成 |
 | 主笔记 + 追加段 | ✅ 组合 1～2 | 「把追加的也给我」 | ① 无 ID 先查 ② `GET /note/qryNoteDetailInfoAndAppend` | 不要只读单条详情再编造追加段 |
 | 处理进度 | ✅ 组合 1～2 | 「转写好了吗」 | `GET /note/queryNoteStatus` | pending / recognizing / analyzing / completed / failed |

@@ -75,6 +75,7 @@
 | 周报/复盘/按结构成文（不是问小智） | `GET /know/queryStandardInputOutputByCommand` |
 | 最近/类型/标题/时间列表（不是语义搜索） | `POST /note/queryNoteList` |
 | 打开详情；只要原文/总结则只展示 `content`/`summary` | `GET /note/querySingleNoteDetail` |
+| 按条件查询单条笔记详情（标题、摘要、正文、状态、来源、录音信息） | `GET /lcdp-app/server/app/note/notes/querySingleNoteDetailByCondition`（不在 `ZHIZAI_BASE_URL` 下） |
 | 主笔记 + 追加段 | `GET /note/qryNoteDetailInfoAndAppend` |
 | 进度 / 等到完成 | `GET /note/queryNoteStatus`（等待=轮询至 `completed`/`failed`/`*_failed`） |
 | 删除（先确认） | `GET /note/deleteNote` |
@@ -87,6 +88,8 @@
 | 语义问答 | 见 [`xiaozhi.md`](xiaozhi.md)，不要用本文件 |
 
 无 `noteId` 时禁止详情/改删/下载/等待。先 `queryNoteList` 按标题匹配，零条停、多条让用户选。**改标题/摘要/总结必须先拿到真实 `noteId` 再调 `updateNoteInfo`**，没有 ID 禁止调用。用户没要分享时不要主动短链；需要时才传 `withShortUrl=true`。不把 `summary` 冒充转写原文。
+
+`querySingleNoteDetail` 与 `querySingleNoteDetailByCondition` 不是同一接口，不能互相替代。打开开放平台笔记、只要转写/纪要、改完读回，仍走 `querySingleNoteDetail`。用户要按条件查单条详情，或需要 `creator_name` / `rec_start_time` / `recording_source` 时，走 `querySingleNoteDetailByCondition`。后者 `withShortUrl` 必填：没要分享传 `false`，要短链才传 `true`。
 
 `createNote` 录音可带 `voiceContent.knowledgeId` / `directoryId`：用户说「放到某某笔记集」时先解析真实 ID 再写入。无效 `knowledgeId`：笔记可能已创建，必须写清「已创建但未归档」。不传目录或 `-1` 表示笔记集根层。
 
@@ -360,6 +363,105 @@ curl --request GET \
     "longitude": null,
     "rec_end_time": "2026-01-26 10:52:47",
     "account_num": "13900001111"
+  },
+  "stack": "",
+  "errorInfos": null,
+  "guidance": null
+}
+```
+
+### GET `/lcdp-app/server/app/note/notes/querySingleNoteDetailByCondition`  按条件查询单条笔记详情
+
+**接口说明**：根据 `noteId` 查询单条笔记详情（标题、摘要、正文、状态、来源、录音信息）。本接口**不在** `ZHIZAI_BASE_URL`（`https://openapi.zzjilu.com/api/v1`）之下，不要拼到开放 API 基址，也不要改写成 `querySingleNoteDetail`。
+
+服务地址：`http://10.10.179.140:8056/lcdp-app/server/app/note/notes/querySingleNoteDetailByCondition`
+
+无真实 `noteId` 禁止调用。用户只给标题时，先 `queryNoteList` 选定，零条停、多条让用户选。`noteId` 协议类型是 long，**当字符串传递**。`resultCode=0` 但 `resultObject.id` 为空：按不存在处理，不要说已打开。
+
+`summary` 与 `content` 在本接口都是 Markdown 文本。只要正文用 `content`，只要摘要用 `summary`；`abstract` 是内容摘要。不要把本接口的 `summary` 当成 `querySingleNoteDetail` 里的纪要，也不要把录音转写数组套到本接口的 `content` 上。经纬度、录音字段仅录音等对应场景返回，其余为 `null`。
+
+鉴权：来源文档将 `Authorization: Bearer {token}` 标为**待确认**。不要编造 token，不要向用户索要口令或短信。调用时仍用本 Skill 统一头 `Authorization: ${ZHIZAI_REC_API_KEY}`（不加 Bearer）。若 HTTP 401，停并说明鉴权方案尚未确认，不要改调 `querySingleNoteDetail` 假装这次已查到。
+
+#### 请求参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| noteId | long | 是 | 笔记 ID。当字符串传递。示例 `20592` |
+| withShortUrl | boolean | 是 | 是否返回短链接。用户没要分享传 `false`；要短链才传 `true` |
+
+Header：`Content-Type: application/json`。`Authorization` 见上，无 Bearer。
+
+#### 请求示例
+
+```bash
+curl --request GET \
+  --url 'http://10.10.179.140:8056/lcdp-app/server/app/note/notes/querySingleNoteDetailByCondition?noteId=20592&withShortUrl=false' \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: your api-key'
+```
+
+#### 响应参数
+
+| 参数名 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| resultCode | string | 是 | 返回码，`"0"` 表示成功。其他失败码来源文档待补充，不要编造 |
+| resultMsg | string | 是 | 返回信息，成功时如 `查询成功` |
+| resultObject | object | 是 | 笔记详情 |
+| resultObject.id | string | 是 | 笔记 ID |
+| resultObject.title | string | 是 | 标题 |
+| resultObject.summary | string | 是 | 摘要（Markdown） |
+| resultObject.content | string | 是 | 正文（Markdown） |
+| resultObject.status | string | 是 | 状态码，如 `00A` |
+| resultObject.latitude | number | 否 | 纬度，可空 |
+| resultObject.longitude | number | 否 | 经度，可空 |
+| resultObject.abstract | string | 是 | 内容摘要 |
+| resultObject.note_type | string | 是 | 笔记类型，如 `document` |
+| resultObject.create_time | string | 是 | 创建时间，`yyyy-MM-dd HH:mm:ss` |
+| resultObject.creator_id | string | 是 | 创建人 ID |
+| resultObject.creator_name | string | 否 | 创建人名称，可空 |
+| resultObject.note_state | string | 是 | 笔记状态，如 `completed` |
+| resultObject.scene_name | string | 是 | 场景名称 |
+| resultObject.source_note_id | string | 否 | 来源笔记 ID |
+| resultObject.scene_id | string | 否 | 场景 ID，可空 |
+| resultObject.note_category | string | 否 | 笔记分类，可空 |
+| resultObject.device_sn | string | 否 | 设备序列号，可空 |
+| resultObject.rec_start_time | string | 否 | 录音开始时间，可空 |
+| resultObject.rec_end_time | string | 否 | 录音结束时间，可空 |
+| resultObject.recording_source | string | 否 | 录音来源，可空 |
+| resultObject.account_num | string | 否 | 账号数，可空。群聊不展开疑似手机号 |
+| stack | string | 否 | 堆栈。对用户禁止展示 |
+| errorInfos | object | 否 | 错误信息。对用户禁止展示未脱敏内容 |
+| guidance | string | 否 | 提示信息 |
+
+#### 响应示例
+
+```json
+{
+  "resultCode": "0",
+  "resultMsg": "查询成功",
+  "resultObject": {
+    "id": "20592",
+    "title": "【示例】市场冲刺周例会",
+    "summary": "## 会议目标\n\n年底业绩提升",
+    "content": "# 公司年底业绩提升会议发言记 ",
+    "status": "00A",
+    "latitude": null,
+    "longitude": null,
+    "abstract": "公司年底业绩仅完成一半，需解决系统崩溃、供应链断货、人员流失问题，10月30日前提升业绩。",
+    "note_type": "document",
+    "create_time": "2026-01-12 12:01:32",
+    "creator_id": "1327849916337197056",
+    "creator_name": null,
+    "note_state": "completed",
+    "scene_name": "智能场景",
+    "source_note_id": "11053",
+    "scene_id": null,
+    "note_category": null,
+    "device_sn": null,
+    "rec_end_time": null,
+    "rec_start_time": null,
+    "recording_source": null,
+    "account_num": null
   },
   "stack": "",
   "errorInfos": null,

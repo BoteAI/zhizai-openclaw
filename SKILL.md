@@ -1,6 +1,6 @@
 ---
 name: zhizai-openclaw
-version: 1.0.2
+version: 1.0.3
 description: |
   用自然语言操作智在记录开放 API：做成笔记（录音/文档/图片/链接/文字）、列表过滤、打开纪要/转写、改删与等待处理、场景与知识卡、笔记集查询与归档、问小智语义问答、周报/复盘模版成文。
   用户说做成笔记、最近有哪些、打开这条、用会议纪要场景、等它处理完、找找关于、放到笔记集、写周报、我的笔记集、配置 ZHIZAI_REC_API_KEY 时使用。
@@ -57,7 +57,8 @@ metadata:
 | 用户说法 | 走哪条 | 不要走 |
 |---|---|---|
 | 「最近有哪些 / 我的录音 / 标题带经营分析 / 这个月的」 | 列表 `queryNoteList` | 问小智 |
-| 「打开这条 / 看纪要 / 只要转写」 | 无 ID 先列表，再 `querySingleNoteDetail`；只要原文用 `content`，只要纪要用 `summary` | 把 summary 当原文 |
+| 「打开这条 / 看纪要 / 只要转写」 | 无 ID 先列表，再 `querySingleNoteDetail`；只要原文用 `content`，只要纪要用 `summary` | 把 summary 当原文；改走 `querySingleNoteDetailByCondition` |
+| 「按条件查这条笔记详情」/ 要创建人、录音起止、录音来源 | 无 ID 先列表，再 `GET /lcdp-app/server/app/note/notes/querySingleNoteDetailByCondition`（`withShortUrl` 必填，默认 `false`） | 把它当成 `querySingleNoteDetail`；拼到 `ZHIZAI_BASE_URL` |
 | 「做成笔记 / 把文件生成笔记 / 记一条 / 收藏链接」 | 一次「做成笔记」闭环（见下） | 只上传就停；追问类型 |
 | 「用某某场景做成笔记」 | ① 查 `sceneId` ② 做成笔记并带 `sceneId` | 把场景名当 ID |
 | 「放到某某笔记集 / 建目录 / 移笔记」 | ① 名称先查 `knowledgeId`/`directoryId` ② `createNote` 带归档字段，或 `moveNotesToKnowledge` | 把名称当 ID；假装已归档 |
@@ -96,6 +97,7 @@ metadata:
 | 做成笔记 | 「把 meeting.mp3 做成笔记」 | ✅ 上传+创建+默认等待 | `noteId`、标题、类型；完成前须 `completed` |
 | 列表过滤 | 「最近有哪些录音」 | ✅ `queryNoteList` | `id`、标题、中文类型、状态、时间。空列表是成功 |
 | 打开 / 纪要 / 原文 | 「打开这条」 | ✅ 无 ID 先查 | 处理中须说明 |
+| 按条件查单条详情 | 「查这条笔记的详情、创建人、录音来源」 | ✅ `querySingleNoteDetailByCondition` | `noteId`、标题、`note_state`；正文 `content`，摘要 `summary` |
 | 改标题 / 摘要 / 总结 | 「把某某笔记的标题改成…」 | ✅ **先查 `noteId`** 再 `updateNoteInfo`，再读回 | 没有真实 ID 禁止调用。只改传入字段 |
 | 删除 / 等待 | 「删掉」「等它处理完」 | ✅ 无 ID 先查；删除先确认 | 读回或终态 |
 | 指定场景后保存 | 「用会议纪要场景…」 | ✅ 先查 `sceneId` | 查不到则停 |
@@ -116,6 +118,7 @@ metadata:
 |---|---|---|
 | 「用会议纪要场景，把录音做成笔记」 | 2 | ① 查 `sceneId` ② 做成笔记（带 `sceneId`，默认等待） |
 | 「打开这条 / 看纪要 / 转写 / 删除 / 下载音频」，没给 ID | 2 | ① 按标题查 `noteId` ② 再详情/删除/下音频 |
+| 「按条件查这条笔记详情」，没给 ID | 2 | ① 按标题查 `noteId` ② `querySingleNoteDetailByCondition`（`withShortUrl` 默认 `false`） |
 | 「把某某笔记的标题/摘要/总结改掉」 | 2～3 | ① 无 `noteId` 先 `queryNoteList` 按标题选定（零条停、多条让用户选）② `POST /note/updateNoteInfo`（`noteId` 必填）③ `querySingleNoteDetail` 读回。没有 ID 禁止调用 |
 | 「打开某某笔记集 / 看某目录」 | 2～3 | ① list 得 `knowledgeId` ② 若点目录再 `queryKnowledgeCatalog` ③ 详情 |
 | 「放到工作笔记集」再保存 | 2～3 | ① 查 `knowledgeId`（及目录） ② 做成笔记带 `knowledgeId`/`directoryId` ③ 默认等待 |
@@ -163,6 +166,7 @@ metadata:
 - **做成笔记**：真实 `noteId`、标题、类型、`note_state`。处理中不要伪造成文完成。
 - **列表**：`id`、`title`、中文类型、`note_state`、`create_time`；有 `summary` 用总结否则 `abstract`。空列表是成功。
 - **详情**：只要原文用 `content`，只要纪要用 `summary`。用户没要分享时不要主动短链（需要时才传 `withShortUrl=true`）。
+- **按条件查单条详情**：走 `querySingleNoteDetailByCondition`。该接口的 `summary` 与 `content` 都是 Markdown；`abstract` 是内容摘要。不要和开放 API 详情的纪要字段混用。
 - **问小智**：拼接 SSE `text`；`notData`/`error` 用原文。不要编造检索结果。
 - **模版成文**：按最终模版填真实笔记；缺失标「未提及」。
 - **进度**：只报告系统阶段。
